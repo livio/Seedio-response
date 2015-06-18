@@ -1,12 +1,12 @@
 {
-  "name": "Seedio-response",
+  "name": "seedio-response",
   "version": "1.0.0",
   "description": "Configures express response handles for use with Seedio",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "author": "",
+  "author": "Livio",
   "license": "ISC",
   "dependencies": {
     "async": "^1.2.1",
