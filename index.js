@@ -13,51 +13,54 @@ var Response = function(_config, _log) {
 
 /**
  * Format and send the server's current response value.
- * @param req is the express request parameter.
- * @param res is the express response parameter.
- * @param next is the callback method.
+ * @param {function} viewHandler is middleware for handling any rendering logic. It takes in a function with (req, res, next)
+ * @returns {Function}
  */
-Response.prototype.responseHandler = function(req, res, next) {
-  req.session.returnTo = null;   // Clear returnTo when response is handled.
-
-  if(isApiPath(req.path)) {
-    if (!res || !res.locals || res.locals.data === undefined || res.locals.data === null) {
-      log.w('res.locals.data is not set. Assuming the endpoint was not handled and does not exist.');
-      res.setError('API endpoint not found.', 404);
-    } else {
-      formatResponse(res.locals.data, req.user, (res.locals.sanitizeData !== false), function(err, responseObject) {
-        if(err) {
-          next(err);
-        } else {
-          res.status(200).json(formatResponseFlags(res.getFlags(), responseObject));
-        }
-      });
+Response.prototype.responseHandler = function(viewHandler) {
+  return function(req, res, next) {
+    if(req.session) {
+      req.session.returnTo = null;   // Clear returnTo when response is handled.
     }
-  } else {
-    res.render('error', {title: 'Error', message: 'The page you are looking for could not be found.', statusCode: 404, flags: res.getFlags()});
+
+    if(isApiPath(req.path) || !viewHandler) {
+      if (!res || !res.locals || res.locals.data === undefined || res.locals.data === null) {
+        log.w('res.locals.data is not set. Assuming the endpoint was not handled and does not exist.');
+        res.setError('API endpoint not found.', 404);
+      } else {
+        formatResponse(res.locals.data, req.user, (res.locals.sanitizeData !== false), function(err, responseObject) {
+          if(err) {
+            next(err);
+          } else {
+            res.status(200).json(formatResponseFlags(res.getFlags(), responseObject));
+          }
+        });
+      }
+    } else {
+      viewHandler(req, res, next);
+    }
   }
 };
 
 /**
  * Format and send the server's current error value.
- * @param err is the current server error object.
- * @param req is the express request parameter.
- * @param res is the express response parameter.
- * @param next is the callback method.
+ * @param {function} errorViewHandler is middleware for handling any rendering logic. It takes in a function with (req, res, next)
+ * @returns {Function}
  */
-Response.prototype.errorHandler = function(err, req, res, next) {
-  if( ! err.status || err.status == 500) {
-    log.e(err);
-    log.e(err.stack);
-  }
+Response.prototype.errorHandler = function(errorViewHandler) {
+  return function (err, req, res, next) {
+    if (!err.status || err.status == 500) {
+      log.e(err);
+      log.e(err.stack);
+    }
 
-  if(isApiPath(req.path)) {
-    res.statusCode = err.status  || 500;
-    res.status(err.status || 500).json(formatResponseFlags(res.getFlags(), formatErrorResponse(err)));
-    next();
-  } else {
-    res.render('error', {title: 'Error', message: err.message, statusCode: err.status || 500, flags: res.getFlags()});
-  }
+    if (isApiPath(req.path) || !viewHandler) {
+      res.statusCode = err.status || 500;
+      res.status(err.status || 500).json(formatResponseFlags(res.getFlags(), formatErrorResponse(err)));
+      next();
+    } else {
+      errorViewHandler(err, req, res, next);
+    }
+  };
 };
 
 /**
